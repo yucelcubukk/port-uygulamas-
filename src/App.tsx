@@ -1,69 +1,122 @@
-import React, { useState } from "react";
-import { Port } from "./types/portTypes";
-import PortList from "./components/PortList";
-import PortForm from "./components/PortForm";
-import ExcelUpload from "./components/ExcelUpload";
-import ExcelExport from "./components/ExcelExport";
+import React, { useState, useRef } from "react";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
+import { confirmDialog, ConfirmDialog } from "primereact/confirmdialog";
+import { Toast } from "primereact/toast";
+import { Port } from "./types/portTypes";
+import PortList from "./types/components/PortList";
+import PortForm from "./types/components/PortForm";
+import ExcelUpload from "./types/components/ExcelUpload";
+import { exportToExcel } from "./utils/excelExport";
 
 const App: React.FC = () => {
   const [ports, setPorts] = useState<Port[]>([]);
-  const [isDialogVisible, setDialogVisible] = useState(false);
+  const [isDialogVisible, setIsDialogVisible] = useState(false);
   const [editingPort, setEditingPort] = useState<Port | null>(null);
+  const toast = useRef<Toast>(null);
 
-  const addPort = (port: Omit<Port, "id">) => {
-    const newPort: Port = {
-      ...port,
-      id: ports.length + 1,
-    };
-    setPorts([...ports, newPort]);
-    setDialogVisible(false);
+  const addPort = (newPort: Omit<Port, "id">) => {
+    setPorts([...ports, { ...newPort, id: ports.length + 1 }]);
+    toast.current?.show({
+      severity: "success",
+      summary: "Başarılı",
+      detail: "Yeni port eklendi.",
+      life: 3000,
+    });
+    setIsDialogVisible(false);
   };
 
-  const updatePort = (updated: Port) => {
-    const updatedPorts = ports.map((p) => (p.id === updated.id ? updated : p));
-    setPorts(updatedPorts);
-    setEditingPort(null);
-    setDialogVisible(false);
+  const confirmUpdate = (updated: Port) => {
+    confirmDialog({
+      message: "Değişikliği yapmak istediğinize emin misiniz?",
+      header: "Düzenleme Onayı",
+      icon: "pi pi-pencil",
+      accept: () => {
+        setPorts(ports.map((p) => (p.id === updated.id ? updated : p)));
+        toast.current?.show({
+          severity: "info",
+          summary: "Güncellendi",
+          detail: "Port bilgileri güncellendi.",
+          life: 3000,
+        });
+        setIsDialogVisible(false);
+        setEditingPort(null);
+      },
+    });
   };
 
-  const deletePort = (id: number) => {
-    setPorts(ports.filter((p) => p.id !== id));
+  const handleDelete = (port: Port) => {
+    confirmDialog({
+      message: `${port.portNumber} numaralı port silinsin mi?`,
+      header: "Silme Onayı",
+      icon: "pi pi-exclamation-triangle",
+      acceptClassName: "p-button-danger",
+      accept: () => {
+        setPorts(ports.filter((p) => p.id !== port.id));
+        toast.current?.show({
+          severity: "warn",
+          summary: "Silindi",
+          detail: "Port başarıyla silindi.",
+          life: 3000,
+        });
+      },
+    });
   };
 
-  const importPorts = (imported: Port[]) => {
-    setPorts([...ports, ...imported]);
+  const handleEdit = (port: Port) => {
+    setEditingPort(port);
+    setIsDialogVisible(true);
+  };
+
+  const importPorts = (importedPorts: Port[]) => {
+    setPorts([...ports, ...importedPorts]);
   };
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Port Yönetim Uygulaması</h2>
-        <div className="flex gap-2">
-          <ExcelExport ports={ports} />
-          <Button label="Yeni Port Ekle" icon="pi pi-plus" onClick={() => setDialogVisible(true)} />
-        </div>
+    <div className="p-6">
+      <Toast ref={toast} />
+
+      <h2 className="text-3xl font-bold mb-6 text-gray-800">Port Yönetim Uygulaması</h2>
+
+      <div className="flex flex-wrap gap-3 justify-start mb-6">
+        <ExcelUpload onImport={importPorts} />
+        <Button
+          label="Excel'e Aktar"
+          icon="pi pi-file-excel"
+          className="p-button-success"
+          onClick={() => exportToExcel(ports)}
+        />
+        <Button
+          label="Yeni Port Ekle"
+          icon="pi pi-plus"
+          className="p-button-primary p-button-outlined"
+          onClick={() => {
+            setEditingPort(null);
+            setIsDialogVisible(true);
+          }}
+        />
       </div>
 
-      <ExcelUpload onImport={importPorts} />
-
-      <PortList ports={ports} onDelete={deletePort} onEdit={setEditingPort} />
+      <PortList ports={ports} onDelete={handleDelete} onEdit={handleEdit} />
 
       <Dialog
         header={editingPort ? "Port Güncelle" : "Yeni Port Ekle"}
-        visible={isDialogVisible || editingPort !== null}
+        visible={isDialogVisible}
         onHide={() => {
-          setDialogVisible(false);
+          setIsDialogVisible(false);
           setEditingPort(null);
         }}
       >
-        <PortForm
-          port={editingPort ?? undefined}
-          onAdd={addPort}
-          onUpdate={updatePort}
-        />
+        <div className="flex flex-col gap-4">
+          <PortForm
+            port={editingPort ?? undefined}
+            onAdd={addPort}
+            onUpdate={confirmUpdate}
+          />
+        </div>
       </Dialog>
+
+      <ConfirmDialog />
     </div>
   );
 };

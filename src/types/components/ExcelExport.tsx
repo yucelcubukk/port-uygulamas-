@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "primereact/button";
 import * as XLSX from "xlsx";
-import { Port } from "../types/portTypes";
+import { Port } from "../portTypes";
 
 interface ExcelExportProps {
   ports: Port[];
@@ -14,12 +14,24 @@ const ExcelExport: React.FC<ExcelExportProps> = ({ ports }) => {
       return;
     }
 
-    const exportData = ports.map(({ id, ...rest }) => rest); // id'yi çıkar
+    // Dosya adını kullanıcıdan al
+    const fileName = prompt("Kaydedilecek dosya adını girin (uzantısız):", "Port_Listesi");
+
+    // Kullanıcı boş bıraktıysa ya da iptal ettiyse çık
+    if (!fileName || fileName.trim() === "") {
+      alert("Dosya adı geçerli değil.");
+      return;
+    }
+
+    // 'id' alanını hariç tutarak veri hazırlama
+    const exportData = ports.map(({ id, ...rest }) => rest);
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
+
     XLSX.utils.book_append_sheet(workbook, worksheet, "Portlar");
 
-    XLSX.writeFile(workbook, "Port_Listesi.xlsx");
+    // Dosyayı kullanıcıdan alınan isimle kaydet
+    XLSX.writeFile(workbook, `${fileName.trim()}.xlsx`);
   };
 
   return (
