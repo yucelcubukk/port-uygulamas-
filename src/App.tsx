@@ -1,8 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { confirmDialog, ConfirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
+import * as XLSX from "xlsx";
 import { Port } from "./types/portTypes";
 import PortList from "./types/components/PortList";
 import PortForm from "./types/components/PortForm";
@@ -14,6 +15,32 @@ const App: React.FC = () => {
   const [isDialogVisible, setIsDialogVisible] = useState(false);
   const [editingPort, setEditingPort] = useState<Port | null>(null);
   const toast = useRef<Toast>(null);
+
+  useEffect(() => {
+    const fetchInitialPorts = async () => {
+      try {
+        const response = await fetch("/tüm-portlar.xlsx");  // Dosya yolu public klasöründe olmalı
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const data: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        const importedPorts: Port[] = data.map((row, index) => ({
+          id: index + 1,
+          portNumber: row["portNumber"] ?? "",
+          projectName: row["projectName"] ?? "",
+          applicationName: row["applicationName"] ?? "",
+          description: row["description"] ?? "",
+        }));
+
+        setPorts(importedPorts);  // Yüklenen portları state'e aktar
+      } catch (error) {
+        console.error("Excel dosyası yüklenirken hata oluştu:", error);
+      }
+    };
+
+    fetchInitialPorts();  // İlk yüklemede dosyayı oku
+  }, []);  // Boş bağımlılık dizisi ile sadece ilk renderda çalışır
 
   const addPort = (newPort: Omit<Port, "id">) => {
     setPorts([...ports, { ...newPort, id: ports.length + 1 }]);
@@ -69,7 +96,12 @@ const App: React.FC = () => {
   };
 
   const importPorts = (importedPorts: Port[]) => {
-    setPorts([...ports, ...importedPorts]);
+    const maxId = ports.reduce((max, p) => (p.id > max ? p.id : max), 0);
+    const newPorts = importedPorts.map((p, index) => ({
+      ...p,
+      id: maxId + index + 1,
+    }));
+    setPorts([...ports, ...newPorts]);
   };
 
   return (

@@ -25,11 +25,15 @@ const PortForm: React.FC<PortFormProps> = ({ port, onAdd, onUpdate }) => {
         .required("Port numarası boş bırakılamaz"),
       projectName: Yup.string().required("Proje adı boş bırakılamaz"),
       applicationName: Yup.string().required("Uygulama adı boş bırakılamaz"),
-      // description opsiyonel
     }),
     onSubmit: (values) => {
+      const payload = {
+        ...values,
+        id: port?.id ?? undefined, // ✅ ID kesin gidiyor!
+      };
+
       if (port && onUpdate) {
-        onUpdate({ ...port, ...values });
+        onUpdate(payload as Port);
       } else {
         onAdd(values);
       }
@@ -48,7 +52,9 @@ const PortForm: React.FC<PortFormProps> = ({ port, onAdd, onUpdate }) => {
           id="portNumber"
           value={formik.values.portNumber}
           onChange={formik.handleChange}
-          className={`w-full ${formik.touched.portNumber && formik.errors.portNumber ? "p-invalid" : ""}`}
+          className={`w-full ${
+            formik.touched.portNumber && formik.errors.portNumber ? "p-invalid" : ""
+          }`}
         />
         {formik.touched.portNumber && formik.errors.portNumber && (
           <small className="p-error">{formik.errors.portNumber}</small>
@@ -64,7 +70,9 @@ const PortForm: React.FC<PortFormProps> = ({ port, onAdd, onUpdate }) => {
           id="projectName"
           value={formik.values.projectName}
           onChange={formik.handleChange}
-          className={`w-full ${formik.touched.projectName && formik.errors.projectName ? "p-invalid" : ""}`}
+          className={`w-full ${
+            formik.touched.projectName && formik.errors.projectName ? "p-invalid" : ""
+          }`}
         />
         {formik.touched.projectName && formik.errors.projectName && (
           <small className="p-error">{formik.errors.projectName}</small>
@@ -80,7 +88,9 @@ const PortForm: React.FC<PortFormProps> = ({ port, onAdd, onUpdate }) => {
           id="applicationName"
           value={formik.values.applicationName}
           onChange={formik.handleChange}
-          className={`w-full ${formik.touched.applicationName && formik.errors.applicationName ? "p-invalid" : ""}`}
+          className={`w-full ${
+            formik.touched.applicationName && formik.errors.applicationName ? "p-invalid" : ""
+          }`}
         />
         {formik.touched.applicationName && formik.errors.applicationName && (
           <small className="p-error">{formik.errors.applicationName}</small>
@@ -100,7 +110,7 @@ const PortForm: React.FC<PortFormProps> = ({ port, onAdd, onUpdate }) => {
         />
       </div>
 
-      {/* Ekle/Güncelle */}
+      {/* Ekle / Güncelle Buton */}
       <div className="flex justify-end">
         <Button
           type="submit"

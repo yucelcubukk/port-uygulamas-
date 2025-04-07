@@ -12,11 +12,11 @@ const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImport }) => {
   const fileUploadRef = useRef<FileUpload>(null);
   const toastRef = useRef<Toast>(null);
 
-  const handleFileUpload = (event: { files: File[] }) => {
+  const handleFileUpload = async (event: { files: File[] }) => {
     const file = event.files[0];
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       if (!e.target?.result) return;
 
       const data = new Uint8Array(e.target.result as ArrayBuffer);
@@ -25,21 +25,43 @@ const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImport }) => {
       const jsonData: any[] = XLSX.utils.sheet_to_json(sheet);
 
       const importedPorts: Port[] = jsonData.map((row, index) => ({
-        id: Date.now() + index,
+        id: Date.now() + index, // geçici ID
         portNumber: row["Port No"] || row["portNumber"] || "",
         projectName: row["Proje Adı"] || row["projectName"] || "",
         applicationName: row["Uygulama Adı"] || row["applicationName"] || "",
         description: row["Açıklama"] || row["description"] || "",
       }));
 
+      // ✅ Frontend state güncelle
       onImport(importedPorts);
+
+      // ✅ Backend'e gönder
+      try {
+        await Promise.all(importedPorts.map(async (port) => {
+          await fetch("http://localhost:3001/ports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(port),
+          });
+        }));
+
+        toastRef.current?.show({
+          severity: "success",
+          summary: "Yükleme Başarılı",
+          detail: `${file.name} backend'e yüklendi`,
+          life: 3000,
+        });
+      } catch (error) {
+        console.error("Backend yükleme hatası:", error);
+        toastRef.current?.show({
+          severity: "error",
+          summary: "Hata",
+          detail: "Backend yükleme hatası oluştu.",
+          life: 3000,
+        });
+      }
+
       fileUploadRef.current?.clear();
-      toastRef.current?.show({
-        severity: "success",
-        summary: "Yükleme Başarılı",
-        detail: `${file.name} yüklendi`,
-        life: 3000,
-      });
     };
 
     reader.readAsArrayBuffer(file);
