@@ -3,7 +3,6 @@ import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { confirmDialog, ConfirmDialog } from "primereact/confirmdialog";
 import { Toast } from "primereact/toast";
-import * as XLSX from "xlsx";
 import { Port } from "./types/portTypes";
 import PortList from "./types/components/PortList";
 import PortForm from "./types/components/PortForm";
@@ -19,73 +18,144 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchInitialPorts = async () => {
       try {
-        const response = await fetch("/tüm-portlar.xlsx");  // Dosya yolu public klasöründe olmalı
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: "array" });
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const data: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-        const importedPorts: Port[] = data.map((row, index) => ({
-          id: index + 1,
-          portNumber: row["portNumber"] ?? "",
-          projectName: row["projectName"] ?? "",
-          applicationName: row["applicationName"] ?? "",
-          description: row["description"] ?? "",
+        const response = await fetch("http://localhost:5050/ports");
+        const data = await response.json();
+  
+        const convertedPorts: Port[] = data.data.map((item: any) => ({
+          id: item.id,
+          portNumber: item.port_number,
+          projectName: item.project_name,
+          applicationName: item.application_name,
+          description: item.description,
         }));
-
-        setPorts(importedPorts);  // Yüklenen portları state'e aktar
+  
+        setPorts(convertedPorts);
       } catch (error) {
-        console.error("Excel dosyası yüklenirken hata oluştu:", error);
+        console.error("Veri çekme hatası:", error);
       }
     };
+  
+    fetchInitialPorts();
+  }, []);
+  
 
-    fetchInitialPorts();  // İlk yüklemede dosyayı oku
-  }, []);  // Boş bağımlılık dizisi ile sadece ilk renderda çalışır
+  const addPort = async (newPort: Omit<Port, "id">) => {
+    try {
+      const response = await fetch("http://localhost:5050/ports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          port_number: newPort.portNumber,
+          project_name: newPort.projectName,
+          application_name: newPort.applicationName,
+          description: newPort.description,
+        }),
+      });
 
-  const addPort = (newPort: Omit<Port, "id">) => {
-    setPorts([...ports, { ...newPort, id: ports.length + 1 }]);
-    toast.current?.show({
-      severity: "success",
-      summary: "Başarılı",
-      detail: "Yeni port eklendi.",
-      life: 3000,
-    });
-    setIsDialogVisible(false);
+      const result = await response.json();
+
+      if (result.success) {
+        const addedPort: Port = {
+          id: result.data.id,
+          portNumber: result.data.port_number,
+          projectName: result.data.project_name,
+          applicationName: result.data.application_name,
+          description: result.data.description,
+        };
+
+        setPorts([...ports, addedPort]);
+        toast.current?.show({
+          severity: "success",
+          summary: "Başarılı",
+          detail: "Yeni port veritabanına eklendi.",
+          life: 3000,
+        });
+        setIsDialogVisible(false);
+      } else {
+        throw new Error(result.error || "Veri eklenemedi.");
+      }
+    } catch (error) {
+      console.error("Ekleme hatası:", error);
+      toast.current?.show({
+        severity: "error",
+        summary: "Hata",
+        detail: "Port eklenirken bir hata oluştu.",
+        life: 3000,
+      });
+    }
   };
 
-  const confirmUpdate = (updated: Port) => {
-    confirmDialog({
-      message: "Değişikliği yapmak istediğinize emin misiniz?",
-      header: "Düzenleme Onayı",
-      icon: "pi pi-pencil",
-      accept: () => {
+  const updatePort = async (updated: Port) => {
+    try {
+      const response = await fetch(`http://localhost:5050/ports/${updated.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          port_number: updated.portNumber,
+          project_name: updated.projectName,
+          application_name: updated.applicationName,
+          description: updated.description,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
         setPorts(ports.map((p) => (p.id === updated.id ? updated : p)));
         toast.current?.show({
           severity: "info",
           summary: "Güncellendi",
-          detail: "Port bilgileri güncellendi.",
+          detail: "Port başarıyla güncellendi.",
           life: 3000,
         });
         setIsDialogVisible(false);
         setEditingPort(null);
-      },
-    });
+      } else {
+        throw new Error(result.error || "Güncelleme başarısız.");
+      }
+    } catch (error) {
+      console.error("Güncelleme hatası:", error);
+      toast.current?.show({
+        severity: "error",
+        summary: "Hata",
+        detail: "Port güncellenirken bir hata oluştu.",
+        life: 3000,
+      });
+    }
   };
 
-  const handleDelete = (port: Port) => {
+  const deletePort = async (port: Port) => {
     confirmDialog({
       message: `${port.portNumber} numaralı port silinsin mi?`,
       header: "Silme Onayı",
       icon: "pi pi-exclamation-triangle",
       acceptClassName: "p-button-danger",
-      accept: () => {
-        setPorts(ports.filter((p) => p.id !== port.id));
-        toast.current?.show({
-          severity: "warn",
-          summary: "Silindi",
-          detail: "Port başarıyla silindi.",
-          life: 3000,
-        });
+      accept: async () => {
+        try {
+          const response = await fetch(`http://localhost:5050/ports/${port.id}`, {
+            method: "DELETE",
+          });
+          const result = await response.json();
+          if (result.success) {
+            setPorts(ports.filter((p) => p.id !== port.id));
+            toast.current?.show({
+              severity: "warn",
+              summary: "Silindi",
+              detail: "Port başarıyla silindi.",
+              life: 3000,
+            });
+          } else {
+            throw new Error(result.error || "Silme başarısız.");
+          }
+        } catch (error) {
+          console.error("Silme hatası:", error);
+          toast.current?.show({
+            severity: "error",
+            summary: "Hata",
+            detail: "Port silinirken bir hata oluştu.",
+            life: 3000,
+          });
+        }
       },
     });
   };
@@ -129,7 +199,7 @@ const App: React.FC = () => {
         />
       </div>
 
-      <PortList ports={ports} onDelete={handleDelete} onEdit={handleEdit} />
+      <PortList ports={ports} onDelete={deletePort} onEdit={handleEdit} />
 
       <Dialog
         header={editingPort ? "Port Güncelle" : "Yeni Port Ekle"}
@@ -143,7 +213,7 @@ const App: React.FC = () => {
           <PortForm
             port={editingPort ?? undefined}
             onAdd={addPort}
-            onUpdate={confirmUpdate}
+            onUpdate={updatePort}
           />
         </div>
       </Dialog>
