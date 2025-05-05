@@ -35,7 +35,12 @@ const PortForm: React.FC<PortFormProps> = ({ port, onAdd, onUpdate }) => {
       if (port && onUpdate) {
         onUpdate(payload as Port);
       } else {
-        onAdd(values);
+        onAdd({
+          portNumber: values.portNumber,
+          projectName: values.projectName,
+          applicationName: values.applicationName,
+          description: values.description
+        });
       }
     },
     enableReinitialize: true,
